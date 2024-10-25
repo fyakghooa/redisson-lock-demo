@@ -1,0 +1,30 @@
+version: '3.3'
+
+services:
+  redis_cluster:
+    image: xxxx/third-party/redis:6.2.6
+    ports:
+      - '7001-7006:7001-7006'
+      - '17001-17006:17001-17006'
+    environment:
+      HOST_IP_ADDRESS: 127.0.0.1
+    entrypoint: |-
+      sh -c '
+        for PORT in `seq 7001 7006`
+        do
+          echo bind 0.0.0.0                             >> redis_$${PORT}.conf;
+          echo port $${PORT}                            >> redis_$${PORT}.conf;
+          echo cluster-enabled yes                      >> redis_$${PORT}.conf;
+          echo cluster-config-file nodes_$${PORT}.conf  >> redis_$${PORT}.conf;
+          echo cluster-node-timeout 5000                >> redis_$${PORT}.conf;
+          echo appendonly yes                           >> redis_$${PORT}.conf;
+          echo protected-mode no                        >> redis_$${PORT}.conf;
+          echo cluster-announce-ip $${HOST_IP_ADDRESS}  >> redis_$${PORT}.conf;
+          echo cluster-announce-port $${PORT}           >> redis_$${PORT}.conf;
+          echo cluster-announce-bus-port 1$${PORT}      >> redis_$${PORT}.conf;
+          nohup redis-server redis_$${PORT}.conf &1> r$${PORT}.log;
+        done
+        sleep 2;
+        echo yes | redis-cli --cluster create $$HOST_IP_ADDRESS:7001 $$HOST_IP_ADDRESS:7002 $$HOST_IP_ADDRESS:7003 $$HOST_IP_ADDRESS:7004 $$HOST_IP_ADDRESS:7005 $$HOST_IP_ADDRESS:7006 --cluster-replicas 1;
+        tail -f r*.log
+      '
